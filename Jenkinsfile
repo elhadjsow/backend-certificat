@@ -39,9 +39,9 @@ pipeline {
         stage('Push to Docker Hub') {
             steps {
                 echo '📤 Envoi de l’image vers Docker Hub...'
-                bat '''
-                echo %DOCKER_HUB_CREDENTIALS_PSW% | docker login -u %DOCKER_HUB_CREDENTIALS_USR% --password-stdin
-                docker push %IMAGE_NAME%:%IMAGE_TAG%
+                powershell '''
+                echo $env:DOCKER_HUB_CREDENTIALS_PSW | docker login -u $env:DOCKER_HUB_CREDENTIALS_USR --password-stdin
+                docker push $env:IMAGE_NAME:$env:IMAGE_TAG
                 docker logout
                 '''
             }
@@ -49,13 +49,14 @@ pipeline {
         stage('Deploy') {
             steps {
                 echo '🚀 Déploiement avec Docker Compose...'
-                bat '''
-                docker pull %IMAGE_NAME%:%IMAGE_TAG%
+                powershell '''
+                docker pull $env:IMAGE_NAME:$env:IMAGE_TAG
                 docker-compose down
                 docker-compose up -d
                 '''
             }
-        }    }
+        }
+    }
 
     post {
         always {
