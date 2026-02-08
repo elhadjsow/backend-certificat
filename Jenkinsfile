@@ -84,7 +84,7 @@ $configContent = @"
 }
 "@
 
-$configContent | Out-File -FilePath "$dockerDir/config.json" -Encoding UTF8 -Force
+$configContent | Out-File -FilePath "$dockerDir/config.json" -Encoding UTF8NoBOM -Force
 Write-Host "Push de l'image..."
 docker push "$env:IMAGE_NAME`:$env:IMAGE_TAG"
 if ($LASTEXITCODE -eq 0) {
@@ -113,10 +113,10 @@ if ($LASTEXITCODE -eq 0) {
     post {
         always {
             echo 'Arrêt et nettoyage des conteneurs de test...'
-            powershell """
-            docker stop ${POSTGRES_CONTAINER} -ErrorAction SilentlyContinue
-            docker rm ${POSTGRES_CONTAINER} -ErrorAction SilentlyContinue
-            """
+            powershell '''
+            docker stop $env:POSTGRES_CONTAINER 2>&1 | Out-Null
+            docker rm $env:POSTGRES_CONTAINER 2>&1 | Out-Null
+            '''
             echo 'Pipeline terminé ✅'
         }
         failure {
