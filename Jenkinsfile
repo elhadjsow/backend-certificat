@@ -56,20 +56,22 @@ pipeline {
         stage('Push to Docker Hub') {
             steps {
                 echo '📤 Envoi de l’image vers Docker Hub...'
-                powershell '''
-                $password = "$env:DOCKER_HUB_CREDENTIALS_PSW"
-                $username = "$env:DOCKER_HUB_CREDENTIALS_USR"
-                $imageName = "$env:IMAGE_NAME"
-                $imageTag = "$env:IMAGE_TAG"
-                $fullImage = "$imageName" + ":" + "$imageTag"
-                
-                # Login to Docker Hub
-                echo $password | docker login -u $username --password-stdin
-                
-                # Push image
-                docker push $fullImage
-                docker logout
-                '''
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_HUB_USR', passwordVariable: 'DOCKER_HUB_PSW')]) {
+                    powershell '''
+                    $password = "$env:DOCKER_HUB_PSW"
+                    $username = "$env:DOCKER_HUB_USR"
+                    $imageName = "$env:IMAGE_NAME"
+                    $imageTag = "$env:IMAGE_TAG"
+                    $fullImage = "$imageName" + ":" + "$imageTag"
+                    
+                    # Login to Docker Hub
+                    echo $password | docker login -u $username --password-stdin
+                    
+                    # Push image
+                    docker push $fullImage
+                    docker logout
+                    '''
+                }
             }
         }
         stage('Deploy') {
