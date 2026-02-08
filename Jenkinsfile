@@ -61,12 +61,13 @@ pipeline {
                 $username = "$env:DOCKER_HUB_CREDENTIALS_USR"
                 $imageName = "$env:IMAGE_NAME"
                 $imageTag = "$env:IMAGE_TAG"
+                $fullImage = "$imageName" + ":" + "$imageTag"
                 
                 # Login to Docker Hub
                 echo $password | docker login -u $username --password-stdin
                 
                 # Push image
-                docker push "$imageName:$imageTag"
+                docker push $fullImage
                 docker logout
                 '''
             }
@@ -75,7 +76,11 @@ pipeline {
             steps {
                 echo '🚀 Déploiement avec Docker Compose...'
                 powershell '''
-                docker pull $env:IMAGE_NAME:$env:IMAGE_TAG
+                $imageName = "$env:IMAGE_NAME"
+                $imageTag = "$env:IMAGE_TAG"
+                $fullImage = "$imageName" + ":" + "$imageTag"
+                
+                docker pull $fullImage
                 docker-compose down
                 docker-compose up -d
                 '''
