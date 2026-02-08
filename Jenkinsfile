@@ -22,10 +22,27 @@ pipeline {
             }
         }
 
+        stage('Start PostgreSQL') {
+            steps {
+                echo '🗄️ Démarrage de PostgreSQL...'
+                powershell '''
+                docker run -d --name postgres_test -e POSTGRES_DB=certificatdb -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=1234 -p 5433:5432 postgres:17
+                Start-Sleep -Seconds 5
+                '''
+            }
+        }
+
         stage('Run Tests') {
             steps {
                 echo '🧪 Lancement des tests unitaires...'
-                bat 'python manage.py test'
+                powershell '''
+                $env:POSTGRES_HOST = "localhost"
+                $env:POSTGRES_PORT = "5433"
+                $env:POSTGRES_DB = "certificatdb"
+                $env:POSTGRES_USER = "postgres"
+                $env:POSTGRES_PASSWORD = "1234"
+                python manage.py test
+                '''
             }
         }
 
@@ -60,6 +77,11 @@ pipeline {
 
     post {
         always {
+            echo 'Arrêt et nettoyage des conteneurs de test...'
+            powershell '''
+            docker stop postgres_test 2>$null
+            docker rm postgres_test 2>$null
+            '''
             echo 'Pipeline terminé ✅'
         }
         failure {
