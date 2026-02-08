@@ -64,7 +64,7 @@ pipeline {
         stage('Push to Docker Hub') {
             steps {
                 echo '📤 Envoi de l’image vers Docker Hub...'
-                withCredentials([usernamePassword(credentialsId: 'docker-hub-pat', usernameVariable: 'DOCKER_HUB_USR', passwordVariable: 'DOCKER_HUB_PSW')]) {
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-token-v2', usernameVariable: 'DOCKER_HUB_USR', passwordVariable: 'DOCKER_HUB_PSW')]) {
                     powershell '''
 $dockerDir = "$env:USERPROFILE\\.docker"
 if (!(Test-Path $dockerDir)) {
