@@ -56,7 +56,7 @@ pipeline {
         stage('Push to Docker Hub') {
             steps {
                 echo '📤 Envoi de l’image vers Docker Hub...'
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_HUB_USR', passwordVariable: 'DOCKER_HUB_PSW')]) {
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-pat', usernameVariable: 'DOCKER_HUB_USR', passwordVariable: 'DOCKER_HUB_PSW')]) {
                     bat '''
 @echo off
 setlocal enabledelayedexpansion
