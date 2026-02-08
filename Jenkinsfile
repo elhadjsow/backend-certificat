@@ -66,7 +66,7 @@ pipeline {
                 echo '📤 Envoi de l’image vers Docker Hub...'
                 withCredentials([usernamePassword(credentialsId: 'docker-hub-token-v2', usernameVariable: 'DOCKER_HUB_USR', passwordVariable: 'DOCKER_HUB_PSW')]) {
                     powershell '''
-$dockerDir = "$env:USERPROFILE\\.docker"
+$dockerDir = "$env:USERPROFILE/.docker"
 if (!(Test-Path $dockerDir)) {
     New-Item -ItemType Directory -Path $dockerDir -Force | Out-Null
 }
@@ -84,12 +84,12 @@ $configContent = @"
 }
 "@
 
-$configContent | Out-File -FilePath "$dockerDir\config.json" -Encoding UTF8 -Force
+$configContent | Out-File -FilePath "$dockerDir/config.json" -Encoding UTF8 -Force
 Write-Host "Push de l'image..."
 docker push "$env:IMAGE_NAME`:$env:IMAGE_TAG"
 if ($LASTEXITCODE -eq 0) {
     Write-Host "Image poussee!"
-    Remove-Item "$dockerDir\config.json" -Force -ErrorAction SilentlyContinue
+    Remove-Item "$dockerDir/config.json" -Force -ErrorAction SilentlyContinue
 } else {
     Write-Host "Erreur push"
     exit 1
