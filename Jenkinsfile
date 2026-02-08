@@ -56,12 +56,26 @@ pipeline {
             steps {
                 echo '📤 Envoi de l’image vers Docker Hub...'
                 withCredentials([usernamePassword(credentialsId: 'docker-hub-pat', usernameVariable: 'DOCKER_HUB_USR', passwordVariable: 'DOCKER_HUB_PSW')]) {
-                    bat '''
-@echo off
-setlocal enabledelayedexpansion
-echo !%DOCKER_HUB_PSW%! | docker login -u %DOCKER_HUB_USR% --password-stdin
-docker push %IMAGE_NAME%:%IMAGE_TAG%
-docker logout
+                    powershell '''
+$env:DOCKER_HUB_USR = "$env:DOCKER_HUB_USR"
+$env:DOCKER_HUB_PSW = "$env:DOCKER_HUB_PSW"
+$imageName = "$env:IMAGE_NAME"
+$imageTag = "$env:IMAGE_TAG"
+
+Write-Host "Connexion à Docker Hub..."
+$password = $env:DOCKER_HUB_PSW
+$username = $env:DOCKER_HUB_USR
+$password | docker login -u $username --password-stdin
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "Push de l'image vers Docker Hub..."
+    docker push "$imageName`:$imageTag"
+    docker logout
+    Write-Host "Image poussée avec succès !"
+} else {
+    Write-Host "Erreur : Connexion à Docker Hub échouée"
+    exit 1
+}
 '''
                 }
             }
