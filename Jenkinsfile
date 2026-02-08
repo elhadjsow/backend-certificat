@@ -84,7 +84,8 @@ $configContent = @"
 }
 "@
 
-$configContent | Out-File -FilePath "$dockerDir/config.json" -Encoding UTF8NoBOM -Force
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllText("$dockerDir/config.json", $configContent, $utf8NoBom)
 Write-Host "Push de l'image..."
 docker push "$env:IMAGE_NAME`:$env:IMAGE_TAG"
 if ($LASTEXITCODE -eq 0) {
