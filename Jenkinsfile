@@ -114,8 +114,8 @@ if ($LASTEXITCODE -eq 0) {
         always {
             echo 'Arrêt et nettoyage des conteneurs de test...'
             powershell """
-            docker stop ${POSTGRES_CONTAINER} 2>$null
-            docker rm ${POSTGRES_CONTAINER} 2>$null
+            docker stop ${POSTGRES_CONTAINER} -ErrorAction SilentlyContinue
+            docker rm ${POSTGRES_CONTAINER} -ErrorAction SilentlyContinue
             """
             echo 'Pipeline terminé ✅'
         }
