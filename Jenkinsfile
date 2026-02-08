@@ -1,16 +1,12 @@
 pipeline {
     agent any
-
+    
     environment {
-        IMAGE_NAME = 'elhadjsow/backend-certificat'
-        IMAGE_TAG = 'latest'
+        DOCKER_IMAGE = 'elhadjsow/backend-certificat'
+        DOCKER_TAG = "${BUILD_NUMBER}"
         POSTGRES_CONTAINER = 'postgres_test'
-        POSTGRES_PORT = '5433'
-        POSTGRES_DB = 'certificatdb'
-        POSTGRES_USER = 'postgres'
-        POSTGRES_PASSWORD = '1234'
     }
-
+    
     stages {
         stage('Checkout') {
             steps {
@@ -18,109 +14,129 @@ pipeline {
                 checkout scm
             }
         }
-
+        
         stage('Install Dependencies') {
             steps {
                 echo '📦 Installation des dépendances...'
                 bat 'pip install -r requirements.txt'
             }
         }
-
+        
         stage('Start PostgreSQL') {
             steps {
                 echo '🗄️ Démarrage de PostgreSQL...'
-                powershell """
-                docker run -d --name ${POSTGRES_CONTAINER} `
-                    -e POSTGRES_DB=${POSTGRES_DB} `
-                    -e POSTGRES_USER=${POSTGRES_USER} `
-                    -e POSTGRES_PASSWORD=${POSTGRES_PASSWORD} `
-                    -p ${POSTGRES_PORT}:5432 postgres:17
-                Start-Sleep -Seconds 5
-                """
+                powershell '''
+                    # Arrêter et supprimer le conteneur s'il existe
+                    $ErrorActionPreference = 'SilentlyContinue'
+                    docker stop postgres_test
+                    docker rm postgres_test
+                    $ErrorActionPreference = 'Continue'
+                    
+                    # Démarrer un nouveau conteneur PostgreSQL
+                    docker run -d `
+                        --name postgres_test `
+                        -e POSTGRES_USER=testuser `
+                        -e POSTGRES_PASSWORD=testpass `
+                        -e POSTGRES_DB=testdb `
+                        -p 5433:5432 `
+                        postgres:13
+                    
+                    # Attendre que PostgreSQL soit prêt
+                    Write-Host "Attente du démarrage de PostgreSQL..."
+                    Start-Sleep -Seconds 10
+                    
+                    # Vérifier que le conteneur est bien démarré
+                    docker ps | Select-String postgres_test
+                '''
             }
         }
-
+        
         stage('Run Tests') {
             steps {
-                echo '🧪 Lancement des tests unitaires...'
-                powershell """
-                \$env:POSTGRES_HOST = "localhost"
-                \$env:POSTGRES_PORT = "${POSTGRES_PORT}"
-                \$env:POSTGRES_DB = "${POSTGRES_DB}"
-                \$env:POSTGRES_USER = "${POSTGRES_USER}"
-                \$env:POSTGRES_PASSWORD = "${POSTGRES_PASSWORD}"
-                python manage.py test
+                echo '🧪 Exécution des tests...'
+                bat '''
+                    set DATABASE_URL=postgresql://testuser:testpass@localhost:5433/testdb
+                    python manage.py test
+                '''
+            }
+        }
+        
+        stage('Code Quality Check') {
+            steps {
+                echo '🔍 Vérification de la qualité du code...'
+                bat 'flake8 . --max-line-length=120 --exclude=migrations,venv,env'
+            }
+        }
+        
+        stage('Build Docker Image') {
+            steps {
+                echo '🐳 Construction de l\'image Docker...'
+                bat """
+                    docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
+                    docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest
                 """
             }
         }
-
-        stage('Build Docker Image') {
-            steps {
-                echo '🐳 Construction de l’image Docker...'
-                bat 'docker build -t %IMAGE_NAME%:%IMAGE_TAG% .'
-            }
-        }
-
+        
         stage('Push to Docker Hub') {
             steps {
-                echo '📤 Envoi de l’image vers Docker Hub...'
-                withCredentials([usernamePassword(credentialsId: 'docker-hub-token-v2', usernameVariable: 'DOCKER_HUB_USR', passwordVariable: 'DOCKER_HUB_PSW')]) {
-                    powershell '''
-$dockerDir = "$env:USERPROFILE/.docker"
-if (!(Test-Path $dockerDir)) {
-    New-Item -ItemType Directory -Path $dockerDir -Force | Out-Null
-}
-
-$authString = "$env:DOCKER_HUB_USR" + ":" + "$env:DOCKER_HUB_PSW"
-$authBase64 = [Convert]::ToBase64String([System.Text.Encoding]::ASCII.GetBytes($authString))
-
-$configContent = @"
-{
-    "auths": {
-        "https://index.docker.io/v1/": {
-            "auth": "$authBase64"
-        }
-    }
-}
-"@
-
-$configContent | Out-File -FilePath "$dockerDir/config.json" -Encoding UTF8NoBOM -Force
-Write-Host "Push de l'image..."
-docker push "$env:IMAGE_NAME`:$env:IMAGE_TAG"
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "Image poussee!"
-    Remove-Item "$dockerDir/config.json" -Force -ErrorAction SilentlyContinue
-} else {
-    Write-Host "Erreur push"
-    exit 1
-}
-'''
+                echo '📤 Publication vers Docker Hub...'
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-credentials',
+                    usernameVariable: 'DOCKER_USERNAME',
+                    passwordVariable: 'DOCKER_PASSWORD'
+                )]) {
+                    bat """
+                        docker login -u %DOCKER_USERNAME% -p %DOCKER_PASSWORD%
+                        docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
+                        docker push ${DOCKER_IMAGE}:latest
+                    """
                 }
             }
         }
-
+        
         stage('Deploy') {
             steps {
-                echo '🚀 Déploiement avec Docker Compose...'
-                powershell """
-                docker-compose down
-                docker-compose up -d
-                """
+                echo '🚀 Déploiement de l\'application...'
+                powershell '''
+                    # Arrêter et supprimer l'ancien conteneur de l'application
+                    $ErrorActionPreference = 'SilentlyContinue'
+                    docker stop backend-certificat-app
+                    docker rm backend-certificat-app
+                    $ErrorActionPreference = 'Continue'
+                    
+                    # Démarrer le nouveau conteneur
+                    docker run -d `
+                        --name backend-certificat-app `
+                        -p 8000:8000 `
+                        -e DATABASE_URL=postgresql://testuser:testpass@host.docker.internal:5433/testdb `
+                        elhadjsow/backend-certificat:latest
+                    
+                    Write-Host "Application déployée avec succès!"
+                '''
             }
         }
     }
-
+    
     post {
         always {
-            echo 'Arrêt et nettoyage des conteneurs de test...'
+            echo '🧹 Nettoyage des conteneurs de test...'
             powershell '''
-            docker stop $env:POSTGRES_CONTAINER 2>&1 | Out-Null
-            docker rm $env:POSTGRES_CONTAINER 2>&1 | Out-Null
+                $ErrorActionPreference = 'SilentlyContinue'
+                docker stop postgres_test
+                docker rm postgres_test
+                $ErrorActionPreference = 'Continue'
+                
+                Write-Host "Nettoyage terminé"
             '''
-            echo 'Pipeline terminé ✅'
+        }
+        success {
+            echo '✅ Pipeline terminé avec succès!'
+            echo "Image Docker: ${DOCKER_IMAGE}:${DOCKER_TAG}"
         }
         failure {
             echo '❌ Le pipeline a échoué'
+            echo 'Vérifiez les logs ci-dessus pour plus de détails'
         }
     }
 }
